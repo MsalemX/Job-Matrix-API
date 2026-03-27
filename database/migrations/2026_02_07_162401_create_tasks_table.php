@@ -20,7 +20,7 @@ return new class extends Migration
             $table->json('skills')->nullable();
             $table->foreignId('assigned_to')->nullable()->constrained('users')->nullOnDelete();
             $table->date('deadline')->nullable();
-            $table->enum('status', ['pending', 'in_progress', 'completed', 'overdue'])->default('pending');
+            $table->enum('status', ['pending', 'in_progress', 'completed'])->default('pending');
             $table->integer('points')->default(10);
             $table->timestamp('completed_at')->nullable();
             $table->boolean('is_archived')->default(false);

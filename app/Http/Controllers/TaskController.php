@@ -277,4 +277,34 @@ class TaskController extends Controller
 
         return response()->json(['message' => 'Task unassigned successfully', 'task' => $task]);
     }
+
+    /**
+     * Assign the current authenticated user to the task (self-assign).
+     */
+    public function assignSelf(Request $request, Project $project, Task $task)
+    {
+        $user = auth()->user();
+
+        // ensure task belongs to project
+        if ($task->project_id !== $project->id) {
+            return response()->json(['message' => 'Mismatch'], 400);
+        }
+
+        $participantInfo = $project->participants()
+            ->where('user_id', $user->id)
+            ->where('status', 'accepted')
+            ->first();
+
+        if (!$participantInfo) {
+            return response()->json(['message' => 'Unauthorized. Only project participants can assign tasks.'], 403);
+        }
+
+        // Assign to self
+        $task->update([
+            'assigned_to' => $user->id,
+            'status' => 'in_progress'
+        ]);
+
+        return response()->json(['message' => 'Task assigned to you successfully', 'task' => $task->load('assignee')]);
+    }
 }

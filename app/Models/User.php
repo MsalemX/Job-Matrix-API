@@ -3,11 +3,10 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
@@ -25,6 +24,7 @@ class User extends Authenticatable
         'username',
         'password',
         'role',
+        'active',
     ];
 
     /**
@@ -98,5 +98,45 @@ class User extends Authenticatable
     public function activityLogs()
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    /**
+     * Check if the user is a participant (member) of the given project.
+     */
+    public function isTeamMember(Project $project)
+    {
+        if ($this->id === $project->user_id) {
+            return true;
+        }
+
+        return $this->projectParticipants()
+            ->where('project_id', $project->id)
+            ->where('status', 'accepted')
+            ->exists();
+    }
+
+    /**
+     * Check if the user is a team admin for the given project.
+     * Considers the project owner as admin and participants with role 'admin' or 'owner'.
+     */
+    public function isTeamAdmin(Project $project)
+    {
+        if ($this->id === $project->user_id) {
+            return true;
+        }
+
+        return $this->projectParticipants()
+            ->where('project_id', $project->id)
+            ->whereIn('role', ['team_admin', 'admin', 'owner'])
+            ->where('status', 'accepted')
+            ->exists();
+    }
+
+    /**
+     * Return the participant record for this user in the given project, if any.
+     */
+    public function projectParticipant(Project $project)
+    {
+        return $this->projectParticipants()->where('project_id', $project->id)->first();
     }
 }

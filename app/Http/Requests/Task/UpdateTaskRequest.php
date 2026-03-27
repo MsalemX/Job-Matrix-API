@@ -24,7 +24,7 @@ class UpdateTaskRequest extends FormRequest
             'skills.*' => 'string',
             'assigned_to' => 'nullable|exists:users,id',
             'deadline' => 'nullable|date',
-            'status' => 'sometimes|in:pending,in_progress,completed,overdue',
+            'status' => 'sometimes|in:pending,in_progress,completed',
             'points' => 'sometimes|integer|min:0',
             'is_archived' => 'sometimes|boolean',
         ];

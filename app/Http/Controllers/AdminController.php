@@ -74,6 +74,18 @@ class AdminController extends Controller
     }
 
     /**
+     * Display all users with their assigned tasks.
+     */
+    public function usersWithTasks()
+    {
+        return response()->json(
+            User::with(['profile', 'assignedTasks.project', 'assignedTasks.section'])
+                ->latest()
+                ->get()
+        );
+    }
+
+    /**
      * Resolve a report (dismiss or take action).
      */
     public function resolveReport(Request $request, Report $report)
