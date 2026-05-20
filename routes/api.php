@@ -15,6 +15,16 @@ use Illuminate\Support\Facades\Route;
 // Public routes (Auth only)
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/auth/google', [AuthController::class, 'googleLogin']);
+
+// Serve storage files with CORS for local development
+Route::get('/storage/{path}', function ($path) {
+    $filePath = storage_path('app/public/' . $path);
+    if (!file_exists($filePath)) {
+        abort(404);
+    }
+    return response()->file($filePath);
+})->where('path', '.*');
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -25,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profiles/{user}', [AuthController::class, 'showProfile']);
     Route::get('/my/tasks', [AuthController::class, 'myTasks']);
     Route::get('/my/projects', [ProjectController::class, 'myProjects']);
+    Route::get('/users/search', [AuthController::class, 'searchUsers']);
 
     // Projects
     Route::get('/projects/search/public', [ProjectController::class, 'publicSearch']);
@@ -37,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/projects/{project}/join', [ProjectController::class, 'join']);
     Route::post('/projects/{project}/add-by-username', [ProjectController::class, 'addByUsername']);
     Route::post('/projects/{project}/invite', [ProjectController::class, 'invite']);
+    Route::get('/projects/invite/{invite}', [ProjectController::class, 'previewInvite']);
     Route::get('/projects/join/{invite}', [ProjectController::class, 'joinWithInvite']);
     Route::get('/projects/{project}/requests', [ProjectController::class, 'pendingRequests']);
     Route::post('/projects/{project}/requests/{participant}/approve', [ProjectController::class, 'approveRequest']);

@@ -60,6 +60,71 @@ class AuthController extends Controller
         ]);
     }
 
+    public function googleLogin(Request $request)
+    {
+        $request->validate([
+            'id_token' => 'required_without:access_token|string|nullable',
+            'access_token' => 'required_without:id_token|string|nullable',
+        ]);
+
+        if ($request->filled('id_token')) {
+            $response = \Illuminate\Support\Facades\Http::get('https://oauth2.googleapis.com/tokeninfo', [
+                'id_token' => $request->id_token,
+            ]);
+        } else {
+            $response = \Illuminate\Support\Facades\Http::get('https://www.googleapis.com/oauth2/v3/userinfo', [
+                'access_token' => $request->access_token,
+            ]);
+        }
+
+        if ($response->failed()) {
+            return response()->json(['message' => 'Invalid Google token', 'error' => $response->json()], 401);
+        }
+
+        $googleUser = $response->json();
+
+        // Check if user exists by email
+        $user = \App\Models\User::where('email', $googleUser['email'])->first();
+
+        if (!$user) {
+            // Generate a unique username
+            $baseUsername = explode('@', $googleUser['email'])[0];
+            $username = $baseUsername;
+            while (\App\Models\User::where('username', $username)->exists()) {
+                $username = $baseUsername . rand(1000, 9999);
+            }
+
+            // Create the user
+            $user = \App\Models\User::create([
+                'name' => $googleUser['name'] ?? $username,
+                'email' => $googleUser['email'],
+                'username' => $username,
+                'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(24)),
+                'role' => 'user',
+            ]);
+
+            // Create profile
+            $profileData = [];
+            if (isset($googleUser['picture'])) {
+                $profileData['avatar'] = $googleUser['picture'];
+            }
+            $user->profile()->create($profileData);
+        } else {
+            // Ensure profile exists
+            if (!$user->profile) {
+                $user->profile()->create();
+            }
+        }
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user->load('profile'),
+        ]);
+    }
+
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
@@ -191,5 +256,28 @@ class AuthController extends Controller
             ->get();
 
         return response()->json(['tasks' => $tasks]);
+    }
+
+    /**
+     * Search users by name, username, or email.
+     */
+    public function searchUsers(Request $request)
+    {
+        $query = $request->query('q', '');
+        if (empty($query)) {
+            return response()->json(['users' => []]);
+        }
+
+        $users = User::where(function ($q) use ($query) {
+            $q->where('name', 'like', "%{$query}%")
+              ->orWhere('username', 'like', "%{$query}%")
+              ->orWhere('email', 'like', "%{$query}%");
+        })
+        ->where('id', '!=', auth()->id())
+        ->with('profile')
+        ->limit(10)
+        ->get();
+
+        return response()->json(['users' => $users]);
     }
 }

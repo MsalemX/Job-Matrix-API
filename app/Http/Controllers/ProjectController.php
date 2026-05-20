@@ -23,7 +23,7 @@ class ProjectController extends Controller
     {
         $projects = Project::where('visibility', 'public')
             ->where('is_archived', false)
-            ->with('owner')
+            ->with('owner', 'participants.user.profile')
             ->latest()
             ->get();
 
@@ -41,7 +41,7 @@ class ProjectController extends Controller
         $projects = Project::where('is_archived', false)
             ->where('visibility', 'public')
             ->search($term)
-            ->with('owner')
+            ->with('owner', 'participants.user.profile')
             ->latest()
             ->paginate($perPage);
 
@@ -67,7 +67,7 @@ class ProjectController extends Controller
                     });
             })
             ->search($term)
-            ->with('owner', 'participants')
+            ->with('owner', 'participants.user.profile')
             ->latest()
             ->paginate($perPage);
 
@@ -91,7 +91,7 @@ class ProjectController extends Controller
                     });
             })
             ->search($term)
-            ->with('owner', 'participants')
+            ->with('owner', 'participants.user.profile')
             ->latest()
             ->paginate($perPage);
 
@@ -111,7 +111,7 @@ class ProjectController extends Controller
             ->where('visibility', 'private')
             ->where('user_id', $user->id)
             ->search($term)
-            ->with('owner', 'participants')
+            ->with('owner', 'participants.user.profile')
             ->latest()
             ->paginate($perPage);
 
@@ -136,7 +136,7 @@ class ProjectController extends Controller
                     });
             })
             ->filterBySkills($skills)
-            ->with('owner', 'participants')
+            ->with('owner', 'participants.user.profile')
             ->latest()
             ->paginate($perPage);
 
@@ -148,7 +148,7 @@ class ProjectController extends Controller
      */
     public function index(Request $request)
     {
-        $projects = $request->user()->projects()->with('participants')->get();
+        $projects = $request->user()->projects()->with('participants.user.profile')->get();
 
         return response()->json($projects);
     }
@@ -165,7 +165,7 @@ class ProjectController extends Controller
                 ->orWhereHas('participants', function ($q2) use ($user) {
                     $q2->where('user_id', $user->id)->where('status', 'accepted');
                 });
-        })->with('owner', 'participants')->get();
+        })->with('owner', 'participants.user.profile')->get();
 
         return response()->json($projects);
     }
@@ -214,7 +214,7 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Unauthorized or request pending'], 403);
         }
 
-        return response()->json($project->load('owner', 'participants.user', 'sections', 'tasks'));
+        return response()->json($project->load('owner', 'participants.user.profile', 'sections', 'tasks'));
     }
 
     /**
@@ -304,6 +304,20 @@ class ProjectController extends Controller
         $url = url("/api/projects/join/{$project->invite_link}");
 
         return response()->json(['invite_link' => $project->invite_link, 'url' => $url]);
+    }
+
+    /**
+     * Preview a project by invite link (without joining).
+     */
+    public function previewInvite($invite)
+    {
+        $project = Project::where('invite_link', $invite)->with('owner', 'participants.user.profile')->first();
+
+        if (! $project) {
+            return response()->json(['message' => 'Invalid invite link'], 404);
+        }
+
+        return response()->json(['project' => $project]);
     }
 
     /**
