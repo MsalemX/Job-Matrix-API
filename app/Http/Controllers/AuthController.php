@@ -180,6 +180,7 @@ class AuthController extends Controller
             'avatar' => 'nullable|image|max:2048', // تم التغيير من string إلى image
             'skills' => 'nullable|array',
             'skills.*' => 'string',
+            'allow_direct_add' => 'sometimes|boolean',
         ]);
 
         // منطق رفع وحفظ الصورة
@@ -199,8 +200,8 @@ class AuthController extends Controller
         // التأكد من وجود بروفايل
         $profile = $user->profile ?? $user->profile()->create();
 
-        // تحديث بيانات البروفايل (البيو والرابط الجديد للصورة)
-        $profileFields = array_intersect_key($validated, array_flip(['bio', 'avatar']));
+        // تحديث بيانات البروفايل
+        $profileFields = array_intersect_key($validated, array_flip(['bio', 'avatar', 'allow_direct_add']));
         if (! empty($profileFields)) {
             $profile->update($profileFields);
         }

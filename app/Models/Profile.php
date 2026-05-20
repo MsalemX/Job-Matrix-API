@@ -6,7 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Profile extends Model
 {
-    protected $fillable = ['user_id', 'bio', 'avatar', 'points'];
+    protected $fillable = ['user_id', 'bio', 'avatar', 'points', 'allow_direct_add'];
+
+    protected $casts = [
+        'allow_direct_add' => 'boolean',
+    ];
 
     public function user()
     {

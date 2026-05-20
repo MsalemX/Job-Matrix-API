@@ -210,7 +210,7 @@ class ProjectController extends Controller
         $isAccepted = $participant && $participant->status === 'accepted';
 
         // Visibility check
-        if (! $isAdmin && $project->visibility === 'private' && ! $isAccepted) {
+        if (! $isAdmin && $project->visibility === 'private' && ! $participant) {
             return response()->json(['message' => 'Unauthorized or request pending'], 403);
         }
 
@@ -247,6 +247,14 @@ class ProjectController extends Controller
             'status' => 'pending',
         ]);
 
+        \App\Models\Notification::create([
+            'user_id' => $project->user_id,
+            'title' => 'طلب انضمام للمشروع',
+            'content' => "يرغب " . auth()->user()->name . " في الانضمام إلى مشروعك: " . $project->name,
+            'type' => 'join_request',
+            'is_read' => false,
+        ]);
+
         return response()->json(['message' => 'Join request sent']);
     }
 
@@ -268,13 +276,76 @@ class ProjectController extends Controller
             return response()->json(['message' => 'User already a participant'], 400);
         }
 
+        // Check if user has allowed direct additions (default true)
+        // If false, return a specific error message
+        $allowDirectAdd = $user->profile->allow_direct_add ?? true;
+        if (!$allowDirectAdd) {
+            return response()->json([
+                'message' => 'This user has disabled direct additions. Please send them the invite link in a chat.'
+            ], 403);
+        }
+
         $participant = $project->participants()->create([
             'user_id' => $user->id,
             'role' => $validated['role'] ?? 'team_member',
             'status' => 'accepted',
         ]);
 
-        return response()->json(['message' => 'User added', 'participant' => $participant->load('user')]);
+        \App\Models\Notification::create([
+            'user_id' => $user->id,
+            'title' => 'تمت إضافتك إلى مشروع',
+            'content' => "قام " . auth()->user()->name . " بإضافتك إلى المشروع: " . $project->name,
+            'type' => 'project_added',
+            'is_read' => false,
+        ]);
+
+        return response()->json(['message' => 'User invited', 'participant' => $participant->load('user')]);
+    }
+
+    /**
+     * Accept an invitation to join a project.
+     */
+    public function acceptInvitation(Project $project)
+    {
+        $participant = $project->participants()->where('user_id', auth()->id())->where('status', 'invited')->first();
+        if (!$participant) {
+            return response()->json(['message' => 'No invitation found'], 404);
+        }
+
+        $participant->update(['status' => 'accepted']);
+
+        \App\Models\Notification::create([
+            'user_id' => $project->user_id,
+            'title' => 'تم قبول الدعوة',
+            'content' => "قام " . auth()->user()->name . " بقبول الدعوة للانضمام إلى المشروع: " . $project->name,
+            'type' => 'invitation_accepted',
+            'is_read' => false,
+        ]);
+
+        return response()->json(['message' => 'Invitation accepted']);
+    }
+
+    /**
+     * Reject an invitation to join a project.
+     */
+    public function rejectInvitation(Project $project)
+    {
+        $participant = $project->participants()->where('user_id', auth()->id())->where('status', 'invited')->first();
+        if (!$participant) {
+            return response()->json(['message' => 'No invitation found'], 404);
+        }
+
+        \App\Models\Notification::create([
+            'user_id' => $project->user_id,
+            'title' => 'تم رفض الدعوة',
+            'content' => "قام " . auth()->user()->name . " برفض الدعوة للانضمام إلى المشروع: " . $project->name,
+            'type' => 'invitation_rejected',
+            'is_read' => false,
+        ]);
+
+        $participant->delete();
+
+        return response()->json(['message' => 'Invitation rejected']);
     }
 
     /**
@@ -311,7 +382,9 @@ class ProjectController extends Controller
      */
     public function previewInvite($invite)
     {
-        $project = Project::where('invite_link', $invite)->with('owner', 'participants.user.profile')->first();
+        $project = Project::where('invite_link', $invite)
+            ->with(['owner', 'participants.user.profile', 'sections.tasks', 'tasks'])
+            ->first();
 
         if (! $project) {
             return response()->json(['message' => 'Invalid invite link'], 404);
@@ -340,10 +413,18 @@ class ProjectController extends Controller
         $project->participants()->create([
             'user_id' => $user->id,
             'role' => 'team_member',
-            'status' => 'accepted',
+            'status' => 'pending',
         ]);
 
-        return response()->json(['message' => 'Joined project', 'project' => $project->load('owner')]);
+        \App\Models\Notification::create([
+            'user_id' => $project->user_id,
+            'title' => 'طلب انضمام جديد للمشروع',
+            'content' => "أرسل " . $user->name . " طلب انضمام للمشروع: " . $project->name . " عبر رابط الدعوة",
+            'type' => 'project_joined',
+            'is_read' => false,
+        ]);
+
+        return response()->json(['message' => 'Join request sent successfully', 'project' => $project->load('owner')]);
     }
 
     /**
@@ -359,6 +440,14 @@ class ProjectController extends Controller
 
         $participant->update(['status' => 'accepted']);
 
+        \App\Models\Notification::create([
+            'user_id' => $participant->user_id,
+            'title' => 'تم قبول طلب الانضمام',
+            'content' => "تم قبول طلب انضمامك للمشروع: " . $project->name,
+            'type' => 'request_approved',
+            'is_read' => false,
+        ]);
+
         return response()->json(['message' => 'Request approved', 'participant' => $participant->load('user')]);
     }
 
@@ -373,9 +462,88 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Invalid participant for this project'], 400);
         }
 
+        \App\Models\Notification::create([
+            'user_id' => $participant->user_id,
+            'title' => 'تم رفض طلب الانضمام',
+            'content' => "تم رفض طلب انضمامك للمشروع: " . $project->name,
+            'type' => 'request_rejected',
+            'is_read' => false,
+        ]);
+
         $participant->delete();
 
         return response()->json(['message' => 'Request rejected and removed']);
+    }
+
+    /**
+     * Remove a participant from the project.
+     */
+    public function removeParticipant(Project $project, \App\Models\ProjectParticipant $participant)
+    {
+        $this->authorizeProjectAdmin($project);
+
+        if ($participant->project_id !== $project->id) {
+            return response()->json(['message' => 'Invalid participant for this project'], 400);
+        }
+
+        // Cannot remove the owner of the project
+        if ($participant->user_id === $project->user_id) {
+            return response()->json(['message' => 'Cannot remove the project owner'], 400);
+        }
+
+        \App\Models\Notification::create([
+            'user_id' => $participant->user_id,
+            'title' => 'تم إزالتك من المشروع',
+            'content' => "قام مدير المشروع بإزالتك من المشروع: " . $project->name,
+            'type' => 'project_removed',
+            'is_read' => false,
+        ]);
+
+        // Unassign user's tasks in this project
+        \App\Models\Task::where('project_id', $project->id)
+            ->where('assigned_to', $participant->user_id)
+            ->update(['assigned_to' => null]);
+
+        $participant->delete();
+
+        return response()->json(['message' => 'Participant removed successfully']);
+    }
+
+    /**
+     * Leave a project.
+     */
+    public function leaveProject(Project $project)
+    {
+        $user = auth()->user();
+        
+        $participant = $project->participants()->where('user_id', $user->id)->first();
+        
+        if (!$participant) {
+            return response()->json(['message' => 'You are not a participant of this project'], 400);
+        }
+
+        // Cannot leave if they are the owner
+        if ($participant->user_id === $project->user_id) {
+            return response()->json(['message' => 'Project owner cannot leave the project'], 400);
+        }
+
+        // Notify project owner
+        \App\Models\Notification::create([
+            'user_id' => $project->user_id,
+            'title' => 'خروج عضو من المشروع',
+            'content' => "قام " . $user->name . " بمغادرة المشروع: " . $project->name,
+            'type' => 'project_left',
+            'is_read' => false,
+        ]);
+
+        // Unassign user's tasks in this project
+        \App\Models\Task::where('project_id', $project->id)
+            ->where('assigned_to', $user->id)
+            ->update(['assigned_to' => null]);
+
+        $participant->delete();
+
+        return response()->json(['message' => 'Successfully left the project']);
     }
 
     /**

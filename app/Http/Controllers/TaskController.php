@@ -248,6 +248,16 @@ class TaskController extends Controller
             'status' => 'in_progress'
         ]);
 
+        if ((int) $targetUserId !== (int) $user->id) {
+            \App\Models\Notification::create([
+                'user_id' => $targetUserId,
+                'title' => 'مهمة جديدة مسندة إليك',
+                'content' => "تم إسناد المهمة '" . $task->name . "' إليك في المشروع: " . $project->name . " بواسطة " . $user->name,
+                'type' => 'task_assigned',
+                'is_read' => false,
+            ]);
+        }
+
         return response()->json(['message' => 'Task assigned successfully', 'task' => $task->load('assignee')]);
     }
 

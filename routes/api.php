@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConversationController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SectionController;
@@ -53,6 +54,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/projects/{project}/requests', [ProjectController::class, 'pendingRequests']);
     Route::post('/projects/{project}/requests/{participant}/approve', [ProjectController::class, 'approveRequest']);
     Route::post('/projects/{project}/requests/{participant}/reject', [ProjectController::class, 'rejectRequest']);
+    Route::delete('/projects/{project}/participants/{participant}', [ProjectController::class, 'removeParticipant']);
+    Route::post('/projects/{project}/invitations/accept', [ProjectController::class, 'acceptInvitation']);
+    Route::post('/projects/{project}/invitations/reject', [ProjectController::class, 'rejectInvitation']);
+    Route::post('/projects/{project}/leave', [ProjectController::class, 'leaveProject']);
     Route::apiResource('projects', ProjectController::class);
 
     // Nested Project Sections
@@ -83,6 +88,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Activity Logs
     Route::get('/activities', [ActivityLogController::class, 'index']);
+
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy']);
 
     // Admin only routes
     Route::middleware('admin')->group(function () {
