@@ -82,6 +82,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/conversations', [ConversationController::class, 'index']);
     Route::get('/conversations/{user}', [ConversationController::class, 'show']);
     Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'storeMessage']);
+    Route::post('/conversations/{conversation}/archive', [ConversationController::class, 'toggleArchive']);
+    Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy']);
+    Route::post('/messages/delete-bulk', [ConversationController::class, 'deleteMessages']);
 
     // AI
     Route::post('/ai/chat', [AIController::class, 'chat']);

@@ -153,9 +153,15 @@ class AuthController extends Controller
 
     public function showProfile(User $user)
     {
-        return response()->json([
-            'user' => $user->load([
-                'profile.skills',
+        $viewerId = auth()->id();
+        $isOwner = $viewerId === $user->id;
+        
+        $user->load(['profile.skills']);
+        
+        $publicActivity = $user->profile ? (bool)$user->profile->public_activity : true;
+        
+        if ($isOwner || $publicActivity) {
+            $user->load([
                 'projectParticipants.project' => function ($query) {
                     $query->where('visibility', 'public');
                 },
@@ -164,7 +170,20 @@ class AuthController extends Controller
                         $q2->where('visibility', 'public');
                     });
                 },
-            ]),
+            ]);
+        } else {
+            // Unload/set empty collections to ensure zero leak
+            $user->setRelation('projectParticipants', collect());
+            $user->setRelation('assignedTasks', collect());
+            
+            // Mask points if profile is private
+            if ($user->profile) {
+                $user->profile->points = 0;
+            }
+        }
+
+        return response()->json([
+            'user' => $user,
         ]);
     }
 
@@ -181,6 +200,7 @@ class AuthController extends Controller
             'skills' => 'nullable|array',
             'skills.*' => 'string',
             'allow_direct_add' => 'sometimes|boolean',
+            'public_activity' => 'sometimes|boolean',
         ]);
 
         // منطق رفع وحفظ الصورة
@@ -201,7 +221,7 @@ class AuthController extends Controller
         $profile = $user->profile ?? $user->profile()->create();
 
         // تحديث بيانات البروفايل
-        $profileFields = array_intersect_key($validated, array_flip(['bio', 'avatar', 'allow_direct_add']));
+        $profileFields = array_intersect_key($validated, array_flip(['bio', 'avatar', 'allow_direct_add', 'public_activity']));
         if (! empty($profileFields)) {
             $profile->update($profileFields);
         }
