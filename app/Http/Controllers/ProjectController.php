@@ -214,7 +214,7 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Unauthorized or request pending'], 403);
         }
 
-        return response()->json($project->load('owner', 'participants.user.profile', 'sections', 'tasks'));
+        return response()->json($project->load('owner', 'participants.user.profile', 'sections.tasks', 'tasks'));
     }
 
     /**

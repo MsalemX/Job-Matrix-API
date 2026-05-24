@@ -13,6 +13,18 @@ class Project extends Model
         'is_archived' => 'boolean',
     ];
 
+    protected $appends = ['progress'];
+
+    public function getProgressAttribute()
+    {
+        $total = $this->tasks()->count();
+        if ($total === 0) {
+            return 0.0;
+        }
+        $completed = $this->tasks()->where('status', 'completed')->count();
+        return round($completed / $total, 2);
+    }
+
     public function owner()
     {
         return $this->belongsTo(User::class, 'user_id');
